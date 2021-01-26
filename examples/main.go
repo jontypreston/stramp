@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/jontypreston/stramp"
+	"github.com/modular-id/stramp"
 )
 
 type Person struct {

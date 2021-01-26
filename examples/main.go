@@ -6,24 +6,24 @@ import (
 )
 
 type Person struct {
-	Name Name `etcd:"name"`
+	Name      Name     `etcd:"name"`
 	Nicknames []string `etcd:"nicknames"`
-	Age int `etcd:"age"`
+	Age       int      `etcd:"age"`
 }
 
 type Name struct {
 	FirstName string `etcd:"first_name"`
-	Surname string `etcd:"surname"`
+	Surname   string `etcd:"surname"`
 }
 
 func main() {
 	a := Person{
 		Name: Name{
 			FirstName: "John",
-			Surname: "Smith",
+			Surname:   "Smith",
 		},
 		Nicknames: []string{"Jonny", "James"},
-		Age:  55,
+		Age:       55,
 	}
 
 	kv, err := stramp.Stramp(a)

@@ -57,7 +57,7 @@ var (
 	TagKey = "etcd"
 
 	// IndexKey translates a slice index into a string key
-	IndexKey = func(i int) string {return strconv.FormatInt(int64(i), 10)}
+	IndexKey = func(i int) string { return strconv.FormatInt(int64(i), 10) }
 )
 
 // Key joins all non-empty strings given into a single string key using the Sep separator.

@@ -14,14 +14,14 @@ Any fields which are not exported or are missing the `etcd` tag are ignored.
 
 ```golang
 type Person struct {
-	Name Name `etcd:"name"`
-	Nicknames []string `etcd:"nicknames"`
-	Age int `etcd:"age"`
+    Name      Name     `etcd:"name"`
+    Nicknames []string `etcd:"nicknames"`
+    Age       int      `etcd:"age"`
 }
 
 type Name struct {
-	FirstName string `etcd:"first_name"`
-	Surname string `etcd:"surname"`
+    FirstName string `etcd:"first_name"`
+    Surname   string `etcd:"surname"`
 }
 ```
 
@@ -29,10 +29,10 @@ type Name struct {
 a := Person{
     Name: Name{
         FirstName: "John",
-        Surname: "Smith",
+        Surname:   "Smith",
     },
     Nicknames: []string{"Jonny", "James"},
-    Age:  55,
+    Age:       55,
 }
 
 kv, _ := stramp.Stramp(a)
@@ -60,7 +60,7 @@ The key for each struct field is given by its tag.
 
 ```golang
 type A struct {
-	Foo string `etcd:"foo"`
+    Foo string `etcd:"foo"`
 }
 ```
 
@@ -84,6 +84,6 @@ By default, the index is used unchanged.
 ```golang
 // Change index key representation to use square brackets
 stramp.IndexKey = func(i int) string {
-	return fmt.Sprintf("[%d]", i)
+    return fmt.Sprintf("[%d]", i)
 }
 ```

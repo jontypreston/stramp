@@ -8,14 +8,18 @@ import (
 	"strings"
 )
 
+// KV is a string -> string mapping
 type KV map[string]string
 
+// Merge merges in the key-value pairs from the other KV.
+// In case of duplicate keys, those from the other KV take precedence.
 func (kv KV) Merge(other KV) {
 	for k, v := range other {
 		kv[k] = v
 	}
 }
 
+// Prefixed returns a new KV where all of the keys have been prefixed.
 func (kv KV) Prefixed(prefix string) KV {
 	prefixed := make(KV)
 
@@ -26,6 +30,8 @@ func (kv KV) Prefixed(prefix string) KV {
 	return prefixed
 }
 
+// Pop returns a new KV containing only the keys which have the prefix given.
+// The prefix is stripped from the new KV.
 func (kv KV) Pop(prefix string) KV {
 	popped := make(KV)
 
@@ -40,14 +46,21 @@ func (kv KV) Pop(prefix string) KV {
 	return popped
 }
 
+// IndexKeyFn is a function that translates a slice index into a string key.
 type IndexKeyFn func(int) string
 
 var (
+	// Sep is the key separator for nested keys
 	Sep = "."
+
+	// TagKey is the tag prefix for struct fields
 	TagKey = "etcd"
+
+	// IndexKey translates a slice index into a string key
 	IndexKey = func(i int) string {return strconv.FormatInt(int64(i), 10)}
 )
 
+// Key joins all non-empty strings given into a single string key using the Sep separator.
 func Key(parts ...string) string {
 	var clean []string
 
@@ -60,6 +73,7 @@ func Key(parts ...string) string {
 	return strings.Join(clean, Sep)
 }
 
+// Stramp converts a struct into a KV map.
 func Stramp(i interface{}) (KV, error) {
 	kv := make(KV)
 
@@ -117,6 +131,8 @@ func Stramp(i interface{}) (KV, error) {
 	return kv, nil
 }
 
+// DeStramp populates a given struct using the KV provided.
+// The struct must be mutable (passed as a pointer).
 func DeStramp(i interface{}, kv KV) error {
 	ptr := reflect.ValueOf(i)
 

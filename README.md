@@ -1,5 +1,6 @@
 # Stramp
 
+
 ## What?
 Convert a `struct` to a flat `map[string]string`.
 
@@ -87,3 +88,9 @@ stramp.IndexKey = func(i int) string {
     return fmt.Sprintf("[%d]", i)
 }
 ```
+
+## TODO
+ - [ ] Unit Testing
+ - [ ] Support *all* fundamental types
+ - [ ] Support common built-in types (like `time.Duration`)
+ - [ ] Refactor project to make better use of [CoR](https://refactoring.guru/design-patterns/chain-of-responsibility)

@@ -49,6 +49,9 @@ func (kv KV) Pop(prefix string) KV {
 // IndexKeyFn is a function that translates a slice index into a string key.
 type IndexKeyFn func(int) string
 
+// KeyIndexFn is a function that translates a string key into a slice index.
+type KeyIndexFn func(string) int
+
 var (
 	// Sep is the key separator for nested keys
 	Sep = "."
@@ -58,6 +61,9 @@ var (
 
 	// IndexKey translates a slice index into a string key
 	IndexKey = func(i int) string { return strconv.FormatInt(int64(i), 10) }
+
+	// KeyIndex translates a string key into a slice index
+	KeyIndex = func(s string) int { x, _ := strconv.ParseInt(s, 10, 64); return int(x) }
 )
 
 // Key joins all non-empty strings given into a single string key using the Sep separator.

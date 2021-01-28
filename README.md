@@ -11,18 +11,18 @@ Stramp flattens a possibly nested `struct` into a flat key-value map.
 
 ## How?
 Define your `struct`.
-Any fields which are not exported or are missing the `etcd` tag are ignored.
+Any fields which are not exported or are missing the `stramp` tag are ignored.
 
 ```golang
 type Person struct {
-    Name      Name     `etcd:"name"`
-    Nicknames []string `etcd:"nicknames"`
-    Age       int      `etcd:"age"`
+    Name      Name     `stramp:"name"`
+    Nicknames []string `stramp:"nicknames"`
+    Age       int      `stramp:"age"`
 }
 
 type Name struct {
-    FirstName string `etcd:"first_name"`
-    Surname   string `etcd:"surname"`
+    FirstName string `stramp:"first_name"`
+    Surname   string `stramp:"surname"`
 }
 ```
 
@@ -42,18 +42,18 @@ kv, _ := stramp.Stramp(a)
 ```golang
 b := Person{}
 
-_ = stramp.DeStramp(&b, kv)
+_ = stramp.DeStramp(kv, &b)
 ```
 
 ## The Basics
 ### Supported Types
- - [x] int
- - [ ] uint
- - [ ] float32 
- - [x] float64
+ - [x] int, int8, int16, int32, int64
+ - [x] uint
+ - [ ] float32, float64
  - [x] string
  - [ ] bool
  - [x] slice (int | float64 | string)
+ - [x] struct
 
 ### Keys
 #### Fields
@@ -61,13 +61,13 @@ The key for each struct field is given by its tag.
 
 ```golang
 type A struct {
-    Foo string `etcd:"foo"`
+    Foo string `stramp:"foo"`
 }
 ```
 
 If the tag `etcd` clashes, you can change it:
 ```golang
-stramp.TagKey = "stramp"
+stramp.TagKey = "something"
 ```
 
 #### Nesting
@@ -89,8 +89,11 @@ stramp.IndexKey = func(i int) string {
 }
 ```
 
+If you change the `IndexKey` function, you should also change the inverse `KeyIndex` function to match.
+Note that `KeyIndex` is not used within `stramp.Stramp` nor `stramp.DeStramp`, thus you need only change it if you use the getter or setter functions.
+
 ## TODO
  - [ ] Unit Testing
  - [ ] Support *all* fundamental types
  - [ ] Support common built-in types (like `time.Duration`)
- - [ ] Refactor project to make better use of [CoR](https://refactoring.guru/design-patterns/chain-of-responsibility)
+ - [x] Refactor project to make better use of [CoR](https://refactoring.guru/design-patterns/chain-of-responsibility)

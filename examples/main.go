@@ -6,14 +6,14 @@ import (
 )
 
 type Person struct {
-	Name      Name     `etcd:"name"`
-	Nicknames []string `etcd:"nicknames"`
-	Age       int      `etcd:"age"`
+	Name      Name     `stramp:"name"`
+	Nicknames []string `stramp:"nicknames"`
+	Age       int      `stramp:"age"`
 }
 
 type Name struct {
-	FirstName string `etcd:"first_name"`
-	Surname   string `etcd:"surname"`
+	FirstName string `stramp:"first_name"`
+	Surname   string `stramp:"surname"`
 }
 
 func main() {
@@ -26,19 +26,29 @@ func main() {
 		Age:       55,
 	}
 
+	fmt.Printf("A: %v \n", a)
+
 	kv, err := stramp.Stramp(a)
 
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("%v\n\n", kv)
+	fmt.Printf("A: %v \n", kv)
 
 	b := Person{}
 
-	if err := stramp.DeStramp(&b, kv); err != nil {
+	if err := stramp.DeStramp(kv, &b); err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("%v\n\n", b)
+	fmt.Printf("A: %v \n", b)
+
+	surname, err := stramp.Get("name.surname", b)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Surname: %s\n", surname)
 }

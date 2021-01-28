@@ -19,33 +19,6 @@ func (kv KV) Merge(other KV) {
 	}
 }
 
-// Prefixed returns a new KV where all of the keys have been prefixed.
-func (kv KV) Prefixed(prefix string) KV {
-	prefixed := make(KV)
-
-	for k, v := range kv {
-		prefixed[Key(prefix, k)] = v
-	}
-
-	return prefixed
-}
-
-// Pop returns a new KV containing only the keys which have the prefix given.
-// The prefix is stripped from the new KV.
-func (kv KV) Pop(prefix string) KV {
-	popped := make(KV)
-
-	for k, v := range kv {
-		parts := strings.Split(k, Sep)
-
-		if len(parts) > 0 && parts[0] == prefix {
-			popped[Key(parts[1:]...)] = v
-		}
-	}
-
-	return popped
-}
-
 // IndexKeyFn is a function that translates a slice index into a string key.
 type IndexKeyFn func(int) string
 
@@ -57,13 +30,24 @@ var (
 	Sep = "."
 
 	// TagKey is the tag prefix for struct fields
-	TagKey = "etcd"
+	TagKey = "stramp"
+
+	// RequireTag defines if struct fields which do not have a tag named TagKey should be ignored.
+	// If false, the field's name will be used if no tag has been set.
+	RequireTag = false
 
 	// IndexKey translates a slice index into a string key
 	IndexKey = func(i int) string { return strconv.FormatInt(int64(i), 10) }
 
-	// KeyIndex translates a string key into a slice index
-	KeyIndex = func(s string) int { x, _ := strconv.ParseInt(s, 10, 64); return int(x) }
+	KeyIndex = func(i string) int {
+		x, err := strconv.ParseInt(i, 10, 64)
+
+		if err != nil {
+			return -1
+		}
+
+		return int(x)
+	}
 )
 
 // Key joins all non-empty strings given into a single string key using the Sep separator.
@@ -79,127 +63,86 @@ func Key(parts ...string) string {
 	return strings.Join(clean, Sep)
 }
 
-// Stramp converts a struct into a KV map.
+var (
+	ErrNotStruct = errors.New("attempt to stramp non-struct type")
+)
+
 func Stramp(i interface{}) (KV, error) {
-	kv := make(KV)
-
-	source := reflect.ValueOf(i)
-	blueprint := source.Type()
-
-	if source.Kind() != reflect.Struct {
-		return nil, errors.New("non-struct type given")
+	if kind := reflect.TypeOf(i).Kind(); kind != reflect.Struct {
+		return nil, fmt.Errorf("%w: %s", ErrNotStruct, kind)
 	}
 
-	for i := 0; i < blueprint.NumField(); i++ {
-		field := blueprint.Field(i)
-		value := source.Field(i)
-
-		name, ok := field.Tag.Lookup(TagKey)
-
-		if !ok {
-			continue
-		}
-
-		switch value.Kind() {
-		case reflect.Struct:
-			nested, err := Stramp(value.Interface())
-
-			if err != nil {
-				return nil, err
-			}
-
-			kv.Merge(nested.Prefixed(name))
-
-		case reflect.Slice:
-			for j := 0; j < value.Len(); j++ {
-				item := value.Index(j)
-
-				conv, ok := Stringify(item.Interface())
-
-				if !ok {
-					return nil, fmt.Errorf("unsupported type %s", field.Type)
-				}
-
-				kv[Key(name, IndexKey(j))] = conv
-			}
-
-		default:
-			conv, ok := Stringify(value.Interface())
-
-			if !ok {
-				return nil, fmt.Errorf("unsupported type %s", field.Type)
-			}
-
-			kv[name] = conv
-		}
-	}
-
-	return kv, nil
+	return Marshal("", i)
 }
 
-// DeStramp populates a given struct using the KV provided.
-// The struct must be mutable (passed as a pointer).
-func DeStramp(i interface{}, kv KV) error {
-	ptr := reflect.ValueOf(i)
-
-	if ptr.Kind() != reflect.Ptr {
-		return errors.New("non-pointer type given")
+func DeStramp(kv KV, i interface{}) error {
+	if reflect.ValueOf(i).Kind() != reflect.Ptr {
+		return fmt.Errorf("%w: %s", ErrImmutableType, reflect.TypeOf(i))
 	}
 
-	dest := ptr.Elem()
-	blueprint := dest.Type()
+	if kind := reflect.ValueOf(i).Elem().Kind(); kind != reflect.Struct {
+		return fmt.Errorf("%w: %s", ErrNotStruct, kind)
+	}
 
-	for i := 0; i < blueprint.NumField(); i++ {
-		field := blueprint.Field(i)
-		value := dest.Field(i)
+	return UnMarshal("", kv, i)
+}
 
-		name, ok := field.Tag.Lookup(TagKey)
+var (
+	ErrUnknownField = errors.New("unknown field")
+)
 
-		if !ok {
-			continue
-		}
+func Get(key string, i interface{}) (interface{}, error) {
+	if kind := reflect.TypeOf(i).Kind(); kind != reflect.Struct {
+		return nil, fmt.Errorf("%w: %s", ErrNotStruct, kind)
+	}
 
-		switch field.Type.Kind() {
+	parts := strings.Split(key, Sep)
+	cur := reflect.ValueOf(i)
+
+	for _, part := range parts {
+		switch cur.Kind() {
 		case reflect.Struct:
-			if err := DeStramp(value.Addr().Interface(), kv.Pop(name)); err != nil {
-				return err
-			}
+			for i := 0; i < cur.NumField(); i++ {
+				field := cur.Field(i)
 
-		case reflect.Slice:
-			for j := 0; true; j++ {
-				repr, ok := kv[Key(name, IndexKey(j))]
+				tag, ok := cur.Type().Field(i).Tag.Lookup(TagKey)
 
 				if !ok {
+					if RequireTag {
+						continue
+					}
+
+					tag = cur.Type().Field(i).Name
+				}
+
+				if tag == part {
+					cur = field
 					break
 				}
 
-				conv, ok := Typeify(repr, field.Type.Elem().Kind())
-
-				if !ok {
-					continue
+				// If we're on the last iteration of loop and still haven't found field, it must not exist
+				if i + 1 == cur.NumField() {
+					return nil, fmt.Errorf("%w: %s", ErrUnknownField, part)
 				}
-
-				value.Set(reflect.Append(value, reflect.ValueOf(conv)))
 			}
+
+		case reflect.Slice:
+			idx := KeyIndex(part)
+
+			if idx < 0 {
+				return nil, fmt.Errorf("failed to parse %s as slice index", part)
+			}
+
+			if idx > cur.Len() + 1 {
+				return nil, fmt.Errorf("index %d is out-of-bounds for slice", idx)
+			}
+
+			cur = cur.Index(idx)
 
 		default:
-			repr, ok := kv[name]
-
-			if !ok {
-				continue
-			}
-
-			conv, ok := Typeify(repr, field.Type.Kind())
-
-			if !ok {
-				continue
-			}
-
-			if value.IsValid() && value.CanSet() {
-				value.Set(reflect.ValueOf(conv))
-			}
+			return nil, fmt.Errorf("nested key %s on scalar value %v", part, cur.Interface())
 		}
 	}
 
-	return nil
+	return cur.Interface(), nil
 }

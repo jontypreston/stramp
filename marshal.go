@@ -7,17 +7,20 @@ import (
 	"strconv"
 )
 
-type Marshaler func (prefix string, i interface{}) (KV, bool)
+type Marshaler func (prefix string, i interface{}) (KV, error)
 
 var (
 	MarshalChain []Marshaler
+
+	ErrTypeMismatch = errors.New("type mismatch")
 	ErrUnsupportedType = errors.New("unsupported type")
+	ErrFailedMarshal = errors.New("failed to marshal")
 )
 
 func init() {
 	MarshalChain = []Marshaler{
-		MarshalInt,
 		MarshalString,
+		MarshalInt,
 		MarshalFloat,
 		MarshalStruct,
 		MarshalSlice,
@@ -26,17 +29,37 @@ func init() {
 
 func Marshal(prefix string, i interface{}) (KV, error) {
 	for _, fn := range MarshalChain {
-		kv, ok := fn(prefix, i)
+		kv, err := fn(prefix, i)
 
-		if ok {
+		switch err {
+		case nil:
 			return kv, nil
+
+		case ErrTypeMismatch:
+			continue
+
+		default:
+			return nil, err
 		}
 	}
 
-	return nil, fmt.Errorf("%w: %s (or one of the types within)", ErrUnsupportedType, reflect.TypeOf(i))
+	return nil, fmt.Errorf("%w %s", ErrUnsupportedType, reflect.TypeOf(i))
 }
 
-func MarshalInt(prefix string, i interface{}) (KV, bool) {
+func MarshalString(prefix string, i interface{}) (KV, error) {
+	x, ok := i.(string)
+
+	if !ok {
+		return nil, ErrTypeMismatch
+	}
+
+	kv := make(KV)
+	kv[prefix] = x
+
+	return kv, nil
+}
+
+func MarshalInt(prefix string, i interface{}) (KV, error) {
 	var x int64
 
 	switch i := i.(type) {
@@ -51,29 +74,16 @@ func MarshalInt(prefix string, i interface{}) (KV, bool) {
 	case int64:
 		x = i
 	default:
-		return nil, false
+		return nil, ErrTypeMismatch
 	}
 
 	kv := make(KV)
 	kv[prefix] = strconv.FormatInt(x, 10)
 
-	return kv, true
+	return kv, nil
 }
 
-func MarshalString(prefix string, i interface{}) (KV, bool) {
-	x, ok := i.(string)
-
-	if !ok {
-		return nil, false
-	}
-
-	kv := make(KV)
-	kv[prefix] = x
-
-	return kv, true
-}
-
-func MarshalFloat(prefix string, i interface{}) (KV, bool) {
+func MarshalFloat(prefix string, i interface{}) (KV, error) {
 	var x float64
 
 	switch i := i.(type) {
@@ -82,20 +92,20 @@ func MarshalFloat(prefix string, i interface{}) (KV, bool) {
 	case float64:
 		x = i
 	default:
-		return nil, false
+		return nil, ErrTypeMismatch
 	}
 
 	kv := make(KV)
 	kv[prefix] = strconv.FormatFloat(x, 'E', -1, 64)
 
-	return kv, true
+	return kv, nil
 }
 
-func MarshalStruct(prefix string, i interface{}) (KV, bool) {
+func MarshalStruct(prefix string, i interface{}) (KV, error) {
 	v := reflect.ValueOf(i)
 
 	if v.Kind() != reflect.Struct {
-		return nil, false
+		return nil, ErrTypeMismatch
 	}
 
 	kv := make(KV)
@@ -119,20 +129,20 @@ func MarshalStruct(prefix string, i interface{}) (KV, bool) {
 		nest, err := Marshal(key, value.Interface())
 
 		if err != nil {
-			return nil, false
+			return nil, fmt.Errorf("%w %s.%s: %s", ErrFailedMarshal, v.Type(), field.Name, err.Error())
 		}
 
 		kv.Merge(nest)
 	}
 
-	return kv, true
+	return kv, nil
 }
 
-func MarshalSlice(prefix string, i interface{}) (KV, bool) {
+func MarshalSlice(prefix string, i interface{}) (KV, error) {
 	v := reflect.ValueOf(i)
 
 	if v.Kind() != reflect.Slice {
-		return nil, false
+		return nil, ErrTypeMismatch
 	}
 
 	kv := make(KV)
@@ -144,11 +154,11 @@ func MarshalSlice(prefix string, i interface{}) (KV, bool) {
 		nest, err := Marshal(key, x)
 
 		if err != nil {
-			return nil, false
+			return nil, fmt.Errorf("%w %s[%d]: %s", ErrFailedMarshal, v.Type(), i, err.Error())
 		}
 
 		kv.Merge(nest)
 	}
 
-	return kv, true
+	return kv, nil
 }

@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"github.com/modular-id/stramp"
+	"reflect"
 )
 
 type Person struct {
 	Name      Name     `stramp:"name"`
 	Nicknames []string `stramp:"nicknames"`
-	Age       int      `stramp:"age"`
+	Age       float64  `stramp:"age"`
 }
 
 type Name struct {
@@ -23,7 +24,7 @@ func main() {
 			Surname:   "Smith",
 		},
 		Nicknames: []string{"Jonny", "James"},
-		Age:       55,
+		Age:       55.5,
 	}
 
 	fmt.Printf("A: %v \n", a)
@@ -36,11 +37,14 @@ func main() {
 
 	fmt.Printf("A: %v \n", kv)
 
-	b := Person{}
+	p := reflect.New(reflect.TypeOf(Person{}))
+	p.Elem().Set(reflect.Zero(reflect.TypeOf(Person{})))
 
-	if err := stramp.DeStramp(kv, &b); err != nil {
+	if err := stramp.DeStramp(kv, p.Interface()); err != nil {
 		panic(err)
 	}
+
+	b := p.Elem().Interface()
 
 	fmt.Printf("A: %v \n", b)
 
